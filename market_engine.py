@@ -6,7 +6,6 @@ import random
 from datetime import datetime
 import certifi
 import os
-import subprocess
 import sys
 import tempfile
 
@@ -39,41 +38,14 @@ def compute_rsi(series, period=14):
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
-# --- UNIVERSAL SSL CERTIFICATE FIX (Local & Cloud Support) ---
+# --- UNIVERSAL SSL CERTIFICATE FIX ---
 @st.cache_resource
 def setup_ssl_certificates():
     cache_dir = os.path.join(tempfile.gettempdir(), "nivesh_bodh")
     os.makedirs(cache_dir, exist_ok=True)
-    certifi_path = certifi.where()
     combined_path = os.path.join(cache_dir, "ca_bundle.pem")
-    
-    # Read base certifi certificates
-    with open(certifi_path, "rb") as src: 
-        bundle = src.read()
-        
-    # ONLY run PowerShell local extraction if executing on a Windows local machine
-    if sys.platform == "win32":
-        ps_script = """
-        $patterns = @('Avast', 'Antivirus', 'SSL/TLS scanning', 'Web/Mail Shield')
-        Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object {
-            $s = $_.Subject
-            ($patterns | Where-Object { $s -like "*$_*" }).Count -gt 0
-        } | ForEach-Object {
-            $bytes = $_.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert)
-            '-----BEGIN CERTIFICATE-----'
-            [Convert]::ToBase64String($bytes, 'InsertLineBreaks')
-            '-----END CERTIFICATE-----'
-        }
-        """
-        result = subprocess.run(["powershell", "-NoProfile", "-Command", ps_script], capture_output=True, text=True, check=False)
-        extra_roots = result.stdout.strip()
-        if extra_roots: 
-            bundle += b"\n" + extra_roots.encode("utf-8") + b"\n"
-            
-    # Write the verified bundle out and update environments globally
-    with open(combined_path, "wb") as dst: 
-        dst.write(bundle)
-        
+    with open(certifi.where(), "rb") as src: bundle = src.read()
+    with open(combined_path, "wb") as dst: dst.write(bundle)
     os.environ["CURL_CA_BUNDLE"] = combined_path
     os.environ["SSL_CERT_FILE"] = combined_path
     os.environ["REQUESTS_CA_BUNDLE"] = combined_path
@@ -84,66 +56,79 @@ setup_ssl_certificates()
 # --- HEADER ---
 st.title("📊 Nivesh Bodh: Pre-Market Engine")
 st.markdown("A top-down algorithmic market scanner by **Nivesh Gyanam**")
+
+# Add a manual refresh button in the sidebar to let users clear cache instantly
+if st.sidebar.button("🔄 Force Live Refresh"):
+    st.cache_data.clear()
+    st.rerun()
+
 st.divider()
 
-# --- 1. MACRO MARKET SNAPSHOT ---
+# --- 1. MACRO MARKET SNAPSHOT (BATCH FETCH) ---
 st.subheader("1. Macro Market Snapshot")
-@st.cache_data(ttl=300)
-def get_macro_data():
+
+@st.cache_data(ttl=60)  # Lowered cache to 1 minute for snappier live tracking
+def get_macro_data_batch():
     macros = ["^NSEI", "^NSEBANK", "^INDIAVIX", "INR=X", "DX-Y.NYB", "BZ=F", "GC=F"]
     data = []
-    for ticker in macros:
-        try:
-            stock = yf.Ticker(ticker)
-            df = stock.history(period="5d")
-            if not df.empty:
-                last_close = df['Close'].iloc[-1]
-                prev_close = df['Close'].iloc[-2]
-                change_pct = ((last_close - prev_close) / prev_close) * 100
-                unit = "$" if "F" in ticker else "₹" if "INR" in ticker or "NSE" in ticker else ""
-                data.append({"Name": MACROS_AND_SECTORS[ticker], "Price": f"{unit}{last_close:,.2f}", "Delta": f"{change_pct:+.2f}%"})
-        except:
-            pass
+    try:
+        # Fetch everything in ONE network call
+        group = yf.download(macros, period="5d", group_by='ticker', progress=False)
+        for ticker in macros:
+            if ticker in group.columns.levels[0]:
+                df = group[ticker].dropna()
+                if not df.empty and len(df) >= 2:
+                    last_close = df['Close'].iloc[-1]
+                    prev_close = df['Close'].iloc[-2]
+                    change_pct = ((last_close - prev_close) / prev_close) * 100
+                    unit = "$" if "F" in ticker else "₹" if "INR" in ticker or "NSE" in ticker else ""
+                    data.append({"Name": MACROS_AND_SECTORS[ticker], "Price": f"{unit}{last_close:,.2f}", "Delta": f"{change_pct:+.2f}%"})
+    except Exception as e:
+        pass
     return data
 
-macro_data = get_macro_data()
+macro_data = get_macro_data_batch()
 if macro_data:
     cols = st.columns(len(macro_data))
     for i, item in enumerate(macro_data):
         cols[i].metric(label=item["Name"], value=item["Price"], delta=item["Delta"])
 else:
-    st.error("Macro Market Snapshot data is currently blank or failed to sync via network.")
+    st.info("🔄 Refreshing Macro Market feeds...")
+
 st.divider()
 
-# --- 2. SECTOR INDEX HEATMAP ---
+# --- 2. SECTOR INDEX HEATMAP (BATCH FETCH) ---
 st.subheader("2. Sector Index Heatmap")
-@st.cache_data(ttl=300)
-def get_sector_data():
+
+@st.cache_data(ttl=60)
+def get_sector_data_batch():
     sectors = ["^CNXIT", "^CNXAUTO", "^CNXPHARMA", "^CNXFMCG", "^CNXMETAL", "^CNXENERGY"]
     results = []
-    for ticker in sectors:
-        try:
-            stock = yf.Ticker(ticker)
-            df = stock.history(period="5d")
-            if not df.empty and len(df) >= 2:
-                last_close = df['Close'].iloc[-1]
-                prev_close = df['Close'].iloc[-2]
-                change = ((last_close - prev_close) / prev_close) * 100
-                results.append({"Sector": MACROS_AND_SECTORS[ticker], "Close": round(last_close, 2), "Change (%)": round(change, 2)})
-        except:
-            pass
+    try:
+        group = yf.download(sectors, period="5d", group_by='ticker', progress=False)
+        for ticker in sectors:
+            if ticker in group.columns.levels[0]:
+                df = group[ticker].dropna()
+                if not df.empty and len(df) >= 2:
+                    last_close = df['Close'].iloc[-1]
+                    prev_close = df['Close'].iloc[-2]
+                    change = ((last_close - prev_close) / prev_close) * 100
+                    results.append({"Sector": MACROS_AND_SECTORS[ticker], "Close": round(last_close, 2), "Change (%)": round(change, 2)})
+    except:
+        pass
     if results:
         return pd.DataFrame(results).sort_values(by="Change (%)", ascending=False).reset_index(drop=True)
     return pd.DataFrame(columns=["Sector", "Close", "Change (%)"])
 
-sector_df = get_sector_data()
+sector_df = get_sector_data_batch()
 if not sector_df.empty:
     st.dataframe(sector_df, width='stretch')
 else:
-    st.error("Sector Index Heatmap data is currently unavailable.")
+    st.info("🔄 Re-calculating sector matrices...")
+
 st.divider()
 
-# --- 3. CROSS-SECTOR MULTI-CAP VIEW (WITH GYANAM SCORE) ---
+# --- 3. CROSS-SECTOR MULTI-CAP VIEW (BATCH FETCH) ---
 st.subheader("3. Cross-Sector Multi-Cap View")
 
 def calculate_gyanam_score(latest_data):
@@ -151,61 +136,61 @@ def calculate_gyanam_score(latest_data):
     if latest_data['Close'] > latest_data.get('EMA_20', 0): score += 20
     if latest_data['Close'] > latest_data.get('EMA_50', 0): score += 20
     if latest_data.get('MACD', 0) > latest_data.get('Signal', 0): score += 25
-    
     rsi = latest_data.get('RSI_14', 50)
     if 40 <= rsi <= 60: score += 15
     elif 30 <= rsi < 40: score += 35
     elif rsi > 70: score -= 10
-    
     if latest_data.get('Volume', 0) > latest_data.get('Vol_MA_20', 0): score += 20
     return min(max(score, 0), 100)
 
-@st.cache_data(ttl=300)
-def get_stock_data():
+@st.cache_data(ttl=60)
+def get_stock_data_batch():
+    tickers = list(WATCHLIST.keys())
     results = []
-    for ticker, info in WATCHLIST.items():
-        try:
-            stock = yf.Ticker(ticker)
-            df = stock.history(period="6mo")
-            if not df.empty and len(df) > 50:
-                df['RSI_14'] = compute_rsi(df['Close'])
-                df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
-                df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
-                
-                exp1 = df['Close'].ewm(span=12, adjust=False).mean()
-                exp2 = df['Close'].ewm(span=26, adjust=False).mean()
-                df['MACD'] = exp1 - exp2
-                df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
-                df["Vol_MA_20"] = df["Volume"].rolling(window=20).mean()
-                
-                latest = df.iloc[-1]
-                
-                signals = []
-                if latest['RSI_14'] > 70: signals.append("⚠️ OVERBOUGHT")
-                elif latest['RSI_14'] < 30: signals.append("🟢 OVERSOLD")
-                if latest['Volume'] > (1.5 * latest['Vol_MA_20']): signals.append("🔥 VOL BREAKOUT")
-                signal_text = " + ".join(signals) if signals else "⚪ NEUTRAL"
-                
-                g_score = calculate_gyanam_score(latest)
-                
-                results.append({
-                    "Ticker": ticker.replace(".NS", ""), "Sector": info["sector"],
-                    "Close (₹)": round(latest['Close'], 2), 
-                    "Gyanam Score": f"{int(g_score)} / 100",
-                    "RSI (14)": round(latest['RSI_14'], 2) if not pd.isna(latest['RSI_14']) else 50.0,
-                    "Actionable Signal": signal_text
-                })
-        except:
-            pass
+    try:
+        # Pull 6 months of data for all stocks at once
+        group = yf.download(tickers, period="6mo", group_by='ticker', progress=False)
+        for ticker in tickers:
+            if ticker in group.columns.levels[0]:
+                df = group[ticker].dropna()
+                if not df.empty and len(df) > 50:
+                    df['RSI_14'] = compute_rsi(df['Close'])
+                    df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
+                    df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
+                    
+                    exp1 = df['Close'].ewm(span=12, adjust=False).mean()
+                    exp2 = df['Close'].ewm(span=26, adjust=False).mean()
+                    df['MACD'] = exp1 - exp2
+                    df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+                    df["Vol_MA_20"] = df["Volume"].rolling(window=20).mean()
+                    
+                    latest = df.iloc[-1]
+                    signals = []
+                    if latest['RSI_14'] > 70: signals.append("⚠️ OVERBOUGHT")
+                    elif latest['RSI_14'] < 30: signals.append("🟢 OVERSOLD")
+                    if latest['Volume'] > (1.5 * latest['Vol_MA_20']): signals.append("🔥 VOL BREAKOUT")
+                    signal_text = " + ".join(signals) if signals else "⚪ NEUTRAL"
+                    
+                    g_score = calculate_gyanam_score(latest)
+                    results.append({
+                        "Ticker": ticker.replace(".NS", ""), "Sector": WATCHLIST[ticker]["sector"],
+                        "Close (₹)": round(latest['Close'], 2), 
+                        "Gyanam Score": f"{int(g_score)} / 100",
+                        "RSI (14)": round(latest['RSI_14'], 2) if not pd.isna(latest['RSI_14']) else 50.0,
+                        "Actionable Signal": signal_text
+                    })
+    except:
+        pass
     if results:
         return pd.DataFrame(results)
     return pd.DataFrame(columns=["Ticker", "Sector", "Close (₹)", "Gyanam Score", "RSI (14)", "Actionable Signal"])
 
-stock_df = get_stock_data()
+stock_df = get_stock_data_batch()
 if not stock_df.empty:
     st.dataframe(stock_df, width='stretch')
 else:
-    st.error("Watchlist Stock matrix failed to generate.")
+    st.info("🔄 Running multi-cap scan...")
+
 st.divider()
 
 # --- 4. STOCK GYANAM: DEEP DIVE HUB ---
@@ -243,7 +228,7 @@ if selected_asset:
 
             with tab_fundamentals:
                 if selected_asset in MACROS_AND_SECTORS:
-                    st.info("💡 **Macro Asset Selected:** Institutional fundamentals like P/E Ratio and ROE do not apply to global indices or commodities.")
+                    st.info("💡 **Macro Asset Selected:** Institutional fundamentals do not apply to global indices.")
                 else:
                     try:
                         info = gyanam_stock.info
@@ -261,7 +246,7 @@ if selected_asset:
                     except:
                         st.warning("Fundamental data temporarily unavailable.")
         except:
-            st.error("Error running deep dive diagnostics for this asset.")
+            st.error("Error running deep dive diagnostics.")
 
 st.divider()
 
