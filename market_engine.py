@@ -12,52 +12,6 @@ import tempfile
 # --- UI PAGE CONFIGURATION ---
 st.set_page_config(page_title="Nivesh Bodh", page_icon="📊", layout="wide")
 
-# --- SAFE CSS INJECTION VIA HTML COMPONENT ---
-# This isolates the curly braces from Streamlit's markdown parser to prevent rendering errors
-st.components.v1.html("""
-<style>
-    body {
-        background-color: #0e1117;
-    }
-    .metric-container {
-        display: grid !important;
-        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) !important;
-        gap: 10px !important;
-        margin-bottom: 20px !important;
-    }
-    .metric-card {
-        background-color: #1e2430 !important;
-        border: 1px solid #2d3748 !important;
-        border-radius: 8px !important;
-        padding: 12px !important;
-        text-align: center !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-    }
-    .metric-title {
-        font-size: 0.8rem !important;
-        color: #a0aec0 !important;
-        font-weight: 600 !important;
-        margin-bottom: 4px !important;
-        text-transform: uppercase !important;
-    }
-    .metric-value {
-        font-size: 1.1rem !important;
-        color: #ffffff !important;
-        font-weight: bold !important;
-    }
-    .metric-delta-pos {
-        font-size: 0.8rem !important;
-        color: #48bb78 !important;
-        margin-top: 2px !important;
-    }
-    .metric-delta-neg {
-        font-size: 0.8rem !important;
-        color: #f56565 !important;
-        margin-top: 2px !important;
-    }
-</style>
-""", height=0)
-
 # --- GLOBAL DATA DICTIONARIES ---
 WATCHLIST = {
     "RELIANCE.NS": {"sector": "Energy", "cap": "Large"}, "TCS.NS": {"sector": "IT", "cap": "Large"},
@@ -111,7 +65,7 @@ st.divider()
 st.sidebar.markdown("### 🧭 Market Sentiment Hub")
 st.sidebar.info("**GIFT Nifty Premium:** Integrating Live Feeds...\n\n**FII / DII Flows:** Integrating Daily Data Ingestion...")
 
-# --- 1. MACRO MARKET SNAPSHOT (FIXED GRID SYSTEM) ---
+# --- 1. MACRO MARKET SNAPSHOT (NATIVE COMPACT GRID) ---
 st.subheader("1. Macro Market Snapshot")
 
 @st.cache_data(ttl=60)
@@ -131,8 +85,7 @@ def get_macro_data_batch():
                     data.append({
                         "Name": MACROS_AND_SECTORS[ticker], 
                         "Price": f"{unit}{last_close:,.2f}", 
-                        "Delta": f"{change_pct:+.2f}%",
-                        "IsPositive": change_pct >= 0
+                        "Delta": f"{change_pct:+.2f}%"
                     })
     except:
         pass
@@ -141,13 +94,12 @@ def get_macro_data_batch():
 macro_data = get_macro_data_batch()
 
 if macro_data:
-    cards_html = ""
-    for item in macro_data:
-        delta_class = "metric-delta-pos" if item["IsPositive"] else "metric-delta-neg"
-        cards_html += f'<div class="metric-card"><div class="metric-title">{item["Name"]}</div><div class="metric-value">{item["Price"]}</div><div class="{delta_class}">{item["Delta"]}</div></div>'
-    
-    full_grid_html = f'<div class="metric-container">{cards_html}</div>'
-    st.markdown(full_grid_html, unsafe_with_html=True)
+    # Break metrics into neat rows of 4 columns max to prevent infinite vertical scrolling on mobile
+    for i in range(0, len(macro_data), 4):
+        chunk = macro_data[i:i+4]
+        cols = st.columns(len(chunk))
+        for idx, item in enumerate(chunk):
+            cols[idx].metric(label=item["Name"], value=item["Price"], delta=item["Delta"])
 else:
     st.info("🔄 Refreshing Macro Market feeds...")
 
