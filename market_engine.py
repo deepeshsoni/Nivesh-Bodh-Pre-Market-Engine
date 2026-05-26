@@ -125,7 +125,7 @@ else:
 
 st.divider()
 
-# --- 2. MACRO MARKET SNAPSHOT (AUTO-RESPONSIVE FLOW) ---
+# --- 2. MACRO MARKET SNAPSHOT (ADAPTIVE CHUNKED GRID) ---
 st.subheader("1. Macro Market Snapshot")
 
 @st.cache_data(ttl=60)
@@ -154,10 +154,20 @@ def get_macro_data_batch():
 macro_data = get_macro_data_batch()
 
 if macro_data:
-    # Use fluid rows that scale gracefully on desktop but stack beautifully on mobile phones
-    cols = st.columns(len(macro_data))
-    for idx, item in enumerate(macro_data):
-        with cols[idx]:
+    # Explicitly segment the 7 macro indices into safe chunks of maximum 4 items per row
+    # Row 1: First 4 indices (Nifty, Bank Nifty, India VIX, USD/INR)
+    row1_data = macro_data[0:4]
+    cols1 = st.columns(4)
+    for idx, item in enumerate(row1_data):
+        with cols1[idx]:
+            with st.container(border=True):
+                st.metric(label=item["Name"], value=item["Price"], delta=item["Delta"])
+                
+    # Row 2: Remaining 3 indices (Dollar Index, Brent Crude, Gold)
+    row2_data = macro_data[4:7]
+    cols2 = st.columns(3)
+    for idx, item in enumerate(row2_data):
+        with cols2[idx]:
             with st.container(border=True):
                 st.metric(label=item["Name"], value=item["Price"], delta=item["Delta"])
 else:
