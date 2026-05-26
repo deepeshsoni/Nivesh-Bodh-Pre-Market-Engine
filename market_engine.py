@@ -56,7 +56,7 @@ setup_ssl_certificates()
 
 # --- HEADER ---
 st.title("📊 Nivesh Bodh: Pre-Market Engine")
-st.markdown("A top-down algorithmic market scanner by **Nivesh Gyanam**")
+st.markdown("A top-down algorithmic market scanner by **Nivesh Gyanam** (Created by Deepesh Soni)")
 
 if st.sidebar.button("🔄 Force Live Refresh"):
     st.cache_data.clear()
