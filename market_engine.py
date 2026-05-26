@@ -70,12 +70,14 @@ st.sidebar.info("**FII / DII Flows Matrix:** Integrating Daily Data Ingestion Pi
 # --- 1. PRE-MARKET DIRECTIONAL BIAS ENGINE ---
 st.subheader("🧭 Early Morning Directional Bias")
 
-@st.cache_data(ttl=60)
-def calculate_pre_market_bias():
+@st.cache_data(ttl=30)
+def calculate_pre_market_bias_safe():
     try:
-        data = yf.download(["IN1!=F", "^NSEI"], period="5d", progress=False)
-        gift_df = data["IN1!=F"].dropna()
-        nifty_df = data["^NSEI"].dropna()
+        gift_ticker = yf.Ticker("IN1!=F")
+        gift_df = gift_ticker.history(period="2d")
+        
+        nifty_ticker = yf.Ticker("^NSEI")
+        nifty_df = nifty_ticker.history(period="2d")
         
         if not gift_df.empty and not nifty_df.empty:
             gift_live = gift_df['Close'].iloc[-1]
@@ -108,7 +110,7 @@ def calculate_pre_market_bias():
         pass
     return None
 
-bias_data = calculate_pre_market_bias()
+bias_data = calculate_pre_market_bias_safe()
 
 if bias_data:
     with st.container(border=True):
@@ -121,11 +123,11 @@ if bias_data:
         st.markdown(f"**Market Context:** {bias_data['details']}")
         st.caption(f"GIFT Nifty Live Continuous Proxy: {bias_data['gift']:,.2f} | Nifty 50 Spot Prev Close: {bias_data['nifty']:,.2f}")
 else:
-    st.info("🧭 Running cross-border sentiment matrix calculations...")
+    st.info("🧭 Syncing cross-border data nodes. Click 'Force Live Refresh' in the sidebar if this takes more than 10 seconds.")
 
 st.divider()
 
-# --- 2. MACRO MARKET SNAPSHOT (COMPACT MATRIX) ---
+# --- 2. PREMIUM MACRO MARKET SNAPSHOT (LIGHTWEIGHT TICKER VIEW) ---
 st.subheader("1. Macro Market Snapshot")
 
 @st.cache_data(ttl=60)
@@ -143,10 +145,10 @@ def get_macro_data_batch():
                     change_pct = ((last_close - prev_close) / prev_close) * 100
                     unit = "$" if "F" in ticker else "₹" if "INR" in ticker or "NSE" in ticker else ""
                     
-                    # Store data as clean text strings for table output
                     data.append({
                         "Asset Index": MACROS_AND_SECTORS[ticker], 
                         "Current Value": f"{unit}{last_close:,.2f}", 
+                        "RawChange": change_pct, # Held behind the scenes for styling math
                         "Daily Change": f"{change_pct:+.2f}%"
                     })
     except:
@@ -156,9 +158,30 @@ def get_macro_data_batch():
 macro_list = get_macro_data_batch()
 
 if macro_list:
-    # Convert list to an elegant, uncollapsable dataframe grid matrix
     macro_matrix_df = pd.DataFrame(macro_list)
-    st.dataframe(macro_matrix_df, use_container_width=True, hide_index=True)
+    
+    # Advanced UI Styling Layer: Applies light green/red highlight markers natively
+    def style_macro_ticker(row):
+        colors = []
+        # Target the text color change depending on market direction values
+        text_color = "#48bb78" if row["RawChange"] >= 0 else "#f56565"
+        colors.append("") # Asset Index default white
+        colors.append(f"color: {text_color}; font-weight: bold;") # Current Value styled
+        colors.append("") # RawChange ignored
+        colors.append(f"color: {text_color}; font-weight: bold;") # Daily Change styled
+        return colors
+
+    # Drop the hidden computational column before rendering
+    cleaned_render_df = macro_matrix_df.drop(columns=["RawChange"])
+    styled_ticker_df = macro_matrix_df.style.apply(style_macro_ticker, axis=1)
+
+    # Output as a compact, fluid, perfectly-styled web interface table mapping edge-to-edge
+    st.dataframe(
+        styled_ticker_df, 
+        use_container_width=True, 
+        hide_index=True,
+        column_order=["Asset Index", "Current Value", "Daily Change"]
+    )
 else:
     st.info("🔄 Refreshing Macro Market feeds...")
 
