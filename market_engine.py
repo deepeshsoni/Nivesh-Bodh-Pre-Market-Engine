@@ -67,26 +67,21 @@ st.divider()
 st.sidebar.markdown("### 🧭 Premium Hub Sneak Peek")
 st.sidebar.info("**FII / DII Flows Matrix:** Integrating Daily Data Ingestion Pipelines...\n\n**Pro Risk Manager:** Automated Portfolio Alerts Coming Soon...")
 
-# --- 1. [NEW SPRINT FEATURE] PRE-MARKET DIRECTIONAL BIAS ENGINE ---
+# --- 1. PRE-MARKET DIRECTIONAL BIAS ENGINE ---
 st.subheader("🧭 Early Morning Directional Bias")
 
 @st.cache_data(ttl=60)
 def calculate_pre_market_bias():
     try:
-        # Batch download GIFT Nifty futures proxy and Nifty 50 Spot data simultaneously
         data = yf.download(["IN1!=F", "^NSEI"], period="5d", progress=False)
-        
         gift_df = data["IN1!=F"].dropna()
         nifty_df = data["^NSEI"].dropna()
         
         if not gift_df.empty and not nifty_df.empty:
             gift_live = gift_df['Close'].iloc[-1]
             nifty_spot_close = nifty_df['Close'].iloc[-1]
-            
-            # Compute point gap spread value
             gap_points = gift_live - nifty_spot_close
             
-            # Algorithmic Sentiment Classification Matrix
             if gap_points >= 70:
                 sentiment = "🚀 STRONG GAP-UP EXPECTED"
                 color = "green"
@@ -130,7 +125,7 @@ else:
 
 st.divider()
 
-# --- 2. MACRO MARKET SNAPSHOT (BALANCED ALIGNED GRID) ---
+# --- 2. MACRO MARKET SNAPSHOT (AUTO-RESPONSIVE FLOW) ---
 st.subheader("1. Macro Market Snapshot")
 
 @st.cache_data(ttl=60)
@@ -159,13 +154,12 @@ def get_macro_data_batch():
 macro_data = get_macro_data_batch()
 
 if macro_data:
-    for i in range(0, len(macro_data), 4):
-        chunk = macro_data[i:i+4]
-        cols = st.columns(4)
-        for idx, item in enumerate(chunk):
-            with cols[idx]:
-                with st.container(border=True):
-                    st.metric(label=item["Name"], value=item["Price"], delta=item["Delta"])
+    # Use fluid rows that scale gracefully on desktop but stack beautifully on mobile phones
+    cols = st.columns(len(macro_data))
+    for idx, item in enumerate(macro_data):
+        with cols[idx]:
+            with st.container(border=True):
+                st.metric(label=item["Name"], value=item["Price"], delta=item["Delta"])
 else:
     st.info("🔄 Refreshing Macro Market feeds...")
 
