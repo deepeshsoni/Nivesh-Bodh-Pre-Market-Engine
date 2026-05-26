@@ -64,10 +64,73 @@ if st.sidebar.button("🔄 Force Live Refresh"):
 st.divider()
 
 # --- MARKET SENTIMENT TRACKER SIDEBAR ---
-st.sidebar.markdown("### 🧭 Market Sentiment Hub")
-st.sidebar.info("**GIFT Nifty Premium:** Integrating Live Feeds...\n\n**FII / DII Flows:** Integrating Daily Data Ingestion...")
+st.sidebar.markdown("### 🧭 Premium Hub Sneak Peek")
+st.sidebar.info("**FII / DII Flows Matrix:** Integrating Daily Data Ingestion Pipelines...\n\n**Pro Risk Manager:** Automated Portfolio Alerts Coming Soon...")
 
-# --- 1. MACRO MARKET SNAPSHOT (BALANCED ALIGNED GRID) ---
+# --- 1. [NEW SPRINT FEATURE] PRE-MARKET DIRECTIONAL BIAS ENGINE ---
+st.subheader("🧭 Early Morning Directional Bias")
+
+@st.cache_data(ttl=60)
+def calculate_pre_market_bias():
+    try:
+        # Batch download GIFT Nifty futures proxy and Nifty 50 Spot data simultaneously
+        data = yf.download(["IN1!=F", "^NSEI"], period="5d", progress=False)
+        
+        gift_df = data["IN1!=F"].dropna()
+        nifty_df = data["^NSEI"].dropna()
+        
+        if not gift_df.empty and not nifty_df.empty:
+            gift_live = gift_df['Close'].iloc[-1]
+            nifty_spot_close = nifty_df['Close'].iloc[-1]
+            
+            # Compute point gap spread value
+            gap_points = gift_live - nifty_spot_close
+            
+            # Algorithmic Sentiment Classification Matrix
+            if gap_points >= 70:
+                sentiment = "🚀 STRONG GAP-UP EXPECTED"
+                color = "green"
+                details = f"GIFT Nifty is trading at aggressive premiums (+{gap_points:.2f} points). Institutional opening bids indicate overwhelming bullish control."
+            elif 20 <= gap_points < 70:
+                sentiment = "🟢 MILD POSITIVE OPENING"
+                color = "green"
+                details = f"GIFT Nifty is flashing moderate premiums (+{gap_points:.2f} points). Expect a steady, positive start with initial dip buying."
+            elif -20 < gap_points < 20:
+                sentiment = "⚪ FLAT / NEUTRAL OPENING"
+                color = "orange"
+                details = f"GIFT Nifty spread is highly compressed ({gap_points:+.2f} points). The market will open flat. Focus purely on stock-specific breakout zones."
+            elif -70 < gap_points <= -20:
+                sentiment = "🔴 MILD NEGATIVE OPENING"
+                color = "red"
+                details = f"GIFT Nifty is indicating a discount ({gap_points:.2f} points). Global macro pressures indicate early morning supply overhead."
+            else:
+                sentiment = "💥 STRUCTURAL GAP-DOWN EXPECTED"
+                color = "red"
+                details = f"GIFT Nifty is flashing severe downside discounts ({gap_points:.2f} points). Heavy bearish momentum globally; protect long positions."
+                
+            return {"sentiment": sentiment, "color": color, "details": details, "gift": gift_live, "nifty": nifty_spot_close}
+    except:
+        pass
+    return None
+
+bias_data = calculate_pre_market_bias()
+
+if bias_data:
+    with st.container(border=True):
+        if bias_data["color"] == "green":
+            st.success(f"### {bias_data['sentiment']}")
+        elif bias_data["color"] == "orange":
+            st.warning(f"### {bias_data['sentiment']}")
+        else:
+            st.error(f"### {bias_data['sentiment']}")
+        st.markdown(f"**Market Context:** {bias_data['details']}")
+        st.caption(f"GIFT Nifty Live Continuous Proxy: {bias_data['gift']:,.2f} | Nifty 50 Spot Prev Close: {bias_data['nifty']:,.2f}")
+else:
+    st.info("🧭 Running cross-border sentiment matrix calculations...")
+
+st.divider()
+
+# --- 2. MACRO MARKET SNAPSHOT (BALANCED ALIGNED GRID) ---
 st.subheader("1. Macro Market Snapshot")
 
 @st.cache_data(ttl=60)
@@ -96,20 +159,19 @@ def get_macro_data_batch():
 macro_data = get_macro_data_batch()
 
 if macro_data:
-    # Split into 4 neat, bordered columns per row to stay aligned across desktop and mobile
     for i in range(0, len(macro_data), 4):
         chunk = macro_data[i:i+4]
-        cols = st.columns(4) # Enforces exactly 4 structural slots
+        cols = st.columns(4)
         for idx, item in enumerate(chunk):
             with cols[idx]:
-                with st.container(border=True): # Wraps it in a clean card box
+                with st.container(border=True):
                     st.metric(label=item["Name"], value=item["Price"], delta=item["Delta"])
 else:
     st.info("🔄 Refreshing Macro Market feeds...")
 
 st.divider()
 
-# --- 2. SECTOR INDEX HEATMAP (RESTORED) ---
+# --- 3. SECTOR INDEX HEATMAP ---
 st.subheader("2. Sector Index Heatmap")
 
 @st.cache_data(ttl=60)
@@ -140,7 +202,7 @@ else:
 
 st.divider()
 
-# --- 3. CROSS-SECTOR MULTI-CAP VIEW (RESTORED WITH GYANAM SCORE) ---
+# --- 4. CROSS-SECTOR MULTI-CAP VIEW (WITH GYANAM SCORE) ---
 st.subheader("3. Cross-Sector Multi-Cap View")
 
 def calculate_gyanam_score(latest_data):
@@ -204,7 +266,7 @@ else:
 
 st.divider()
 
-# --- 4. STOCK GYANAM: DEEP DIVE HUB (RESTORED) ---
+# --- 5. STOCK GYANAM: DEEP DIVE HUB ---
 st.subheader("🔍 4. Stock Gyanam: Analysis & Charting Hub")
 
 combined_options = list(WATCHLIST.keys()) + [k for k in MACROS_AND_SECTORS.keys() if k in yf.download(list(MACROS_AND_SECTORS.keys()), period="1d", progress=False).columns.levels[0]]
@@ -238,7 +300,7 @@ if selected_asset:
 
         with tab_fundamentals:
             if ".NS" not in selected_asset:
-                st.info("💡 **Macro Asset Selected:** Institutional metrics like P/E and ROE are restricted to equity equities.")
+                st.info("💡 **Macro Asset Selected:** Institutional metrics like P/E and ROE are restricted to equity stocks.")
             else:
                 try:
                     info = gyanam_stock.info
@@ -260,7 +322,7 @@ if selected_asset:
 
 st.divider()
 
-# --- 5. DAILY LEARNING (RESTORED) ---
+# --- 6. DAILY LEARNING ---
 st.subheader("5. Nivesh Gyanam: Daily Learning")
 topics = [
     {"topic": "MACD Crossovers", "lesson": "When the MACD line crosses above the Signal line, it indicates shifting bullish momentum. When paired with an RSI crossing 50, probability of a sustained rally increases."},
