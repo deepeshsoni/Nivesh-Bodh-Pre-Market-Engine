@@ -202,4 +202,33 @@ def get_stock_data_batch():
                     results.append({
                         "Ticker": ticker.replace(".NS", ""), "Sector": WATCHLIST[ticker]["sector"],
                         "Close (₹)": round(latest['Close'], 2), 
-                        "Gyanam Score": f"{int(g_score)} / 10
+                        "Gyanam Score": f"{int(g_score)} / 100",
+                        "RSI (14)": round(latest['RSI_14'], 2) if not pd.isna(latest['RSI_14']) else 50.0,
+                        "Actionable Signal": signal_text
+                    })
+    except:
+        pass
+    if results:
+        return pd.DataFrame(results)
+    return pd.DataFrame(columns=["Ticker", "Sector", "Close (₹)", "Gyanam Score", "RSI (14)", "Actionable Signal"])
+
+stock_df = get_stock_data_batch()
+if not stock_df.empty:
+    st.dataframe(stock_df, use_container_width=True)
+else:
+    st.info("🔄 Running multi-cap scan...")
+
+st.divider()
+
+# --- 3. DAILY LEARNING ---
+st.subheader("3. Nivesh Gyanam: Daily Learning")
+topics = [
+    {"topic": "MACD Crossovers", "lesson": "When the MACD line crosses above the Signal line, it indicates shifting bullish momentum. When paired with an RSI crossing 50, probability of a sustained rally increases."},
+    {"topic": "The 50-EMA Baseline", "lesson": "The 50-Day Exponential Moving Average is the institutional baseline. Assets trading above it are in uptrends; assets below it are in downtrends. Buy the bounces, sell the breakdowns."},
+    {"topic": "Volume Validation", "lesson": "A breakout is only trustworthy if the daily volume significantly exceeds the 20-day Volume MA. Low volume breakouts are often traps."}
+]
+day_of_year = datetime.now().timetuple().tm_yday
+random.seed(day_of_year)
+daily_lesson = random.choice(topics)
+st.info(f"**💡 {daily_lesson['topic']}**: {daily_lesson['lesson']}")
+random.seed()
