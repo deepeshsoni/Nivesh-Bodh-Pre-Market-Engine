@@ -15,7 +15,6 @@ st.set_page_config(page_title="Nivesh Bodh", page_icon="📊", layout="wide")
 # --- MOBILE COMPACT CARD STYLE INJECTION ---
 st.markdown("""
 <style>
-    /* Force responsive grid boxes for mobile screens */
     .metric-container {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -104,11 +103,11 @@ if st.sidebar.button("🔄 Force Live Refresh"):
 
 st.divider()
 
-# --- [FUTURE SPRINT SNEAK PEEK] PRE-MARKET SENTIMENT MONITOR ---
+# --- MARKET SENTIMENT TRACKER SIDEBAR ---
 st.sidebar.markdown("### 🧭 Market Sentiment Hub")
 st.sidebar.info("**GIFT Nifty Premium:** Integrating Live Feeds...\n\n**FII / DII Flows:** Integrating Daily Data Ingestion...")
 
-# --- 1. MACRO MARKET SNAPSHOT (COMPACT MOBILE BOXES) ---
+# --- 1. MACRO MARKET SNAPSHOT (FIXED GRID SYSTEM) ---
 st.subheader("1. Macro Market Snapshot")
 
 @st.cache_data(ttl=60)
@@ -138,19 +137,14 @@ def get_macro_data_batch():
 macro_data = get_macro_data_batch()
 
 if macro_data:
-    # Build HTML string dynamically to output the responsive grid system
-    html_grid = '<div class="metric-container">'
+    # Safely construct the raw responsive boxes HTML
+    cards_html = ""
     for item in macro_data:
         delta_class = "metric-delta-pos" if item["IsPositive"] else "metric-delta-neg"
-        html_grid += f"""
-        <div class="metric-card">
-            <div class="metric-title">{item["Name"]}</div>
-            <div class="metric-value">{item["Price"]}</div>
-            <div class="{delta_class}">{item["Delta"]}</div>
-        </div>
-        """
-    html_grid += '</div>'
-    st.markdown(html_grid, unsafe_with_html=True)
+        cards_html += f'<div class="metric-card"><div class="metric-title">{item["Name"]}</div><div class="metric-value">{item["Price"]}</div><div class="{delta_class}">{item["Delta"]}</div></div>'
+    
+    full_grid_html = f'<div class="metric-container">{cards_html}</div>'
+    st.markdown(full_grid_html, unsafe_with_html=True)
 else:
     st.info("🔄 Refreshing Macro Market feeds...")
 
