@@ -125,7 +125,7 @@ else:
 
 st.divider()
 
-# --- 2. MACRO MARKET SNAPSHOT (ADAPTIVE CHUNKED GRID) ---
+# --- 2. MACRO MARKET SNAPSHOT (COMPACT MATRIX) ---
 st.subheader("1. Macro Market Snapshot")
 
 @st.cache_data(ttl=60)
@@ -142,34 +142,23 @@ def get_macro_data_batch():
                     prev_close = df['Close'].iloc[-2]
                     change_pct = ((last_close - prev_close) / prev_close) * 100
                     unit = "$" if "F" in ticker else "₹" if "INR" in ticker or "NSE" in ticker else ""
+                    
+                    # Store data as clean text strings for table output
                     data.append({
-                        "Name": MACROS_AND_SECTORS[ticker], 
-                        "Price": f"{unit}{last_close:,.2f}", 
-                        "Delta": f"{change_pct:+.2f}%"
+                        "Asset Index": MACROS_AND_SECTORS[ticker], 
+                        "Current Value": f"{unit}{last_close:,.2f}", 
+                        "Daily Change": f"{change_pct:+.2f}%"
                     })
     except:
         pass
     return data
 
-macro_data = get_macro_data_batch()
+macro_list = get_macro_data_batch()
 
-if macro_data:
-    # Explicitly segment the 7 macro indices into safe chunks of maximum 4 items per row
-    # Row 1: First 4 indices (Nifty, Bank Nifty, India VIX, USD/INR)
-    row1_data = macro_data[0:4]
-    cols1 = st.columns(4)
-    for idx, item in enumerate(row1_data):
-        with cols1[idx]:
-            with st.container(border=True):
-                st.metric(label=item["Name"], value=item["Price"], delta=item["Delta"])
-                
-    # Row 2: Remaining 3 indices (Dollar Index, Brent Crude, Gold)
-    row2_data = macro_data[4:7]
-    cols2 = st.columns(3)
-    for idx, item in enumerate(row2_data):
-        with cols2[idx]:
-            with st.container(border=True):
-                st.metric(label=item["Name"], value=item["Price"], delta=item["Delta"])
+if macro_list:
+    # Convert list to an elegant, uncollapsable dataframe grid matrix
+    macro_matrix_df = pd.DataFrame(macro_list)
+    st.dataframe(macro_matrix_df, use_container_width=True, hide_index=True)
 else:
     st.info("🔄 Refreshing Macro Market feeds...")
 
@@ -200,7 +189,7 @@ def get_sector_data_batch():
 
 sector_df = get_sector_data_batch()
 if not sector_df.empty:
-    st.dataframe(sector_df, use_container_width=True)
+    st.dataframe(sector_df, use_container_width=True, hide_index=True)
 else:
     st.info("🔄 Re-calculating sector matrices...")
 
@@ -264,7 +253,7 @@ def get_stock_data_batch():
 
 stock_df = get_stock_data_batch()
 if not stock_df.empty:
-    st.dataframe(stock_df, use_container_width=True)
+    st.dataframe(stock_df, use_container_width=True, hide_index=True)
 else:
     st.info("🔄 Running multi-cap scan...")
 
