@@ -12,6 +12,49 @@ import tempfile
 # --- UI PAGE CONFIGURATION ---
 st.set_page_config(page_title="Nivesh Bodh", page_icon="📊", layout="wide")
 
+# --- MOBILE COMPACT CARD STYLE INJECTION ---
+st.markdown("""
+<style>
+    /* Force responsive grid boxes for mobile screens */
+    .metric-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    .metric-card {
+        background-color: #1e2430;
+        border: 1px solid #2d3748;
+        border-radius: 8px;
+        padding: 12px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .metric-title {
+        font-size: 0.8rem;
+        color: #a0aec0;
+        font-weight: 600;
+        margin-bottom: 4px;
+        text-transform: uppercase;
+    }
+    .metric-value {
+        font-size: 1.1rem;
+        color: #ffffff;
+        font-weight: bold;
+    }
+    .metric-delta-pos {
+        font-size: 0.8rem;
+        color: #48bb78;
+        margin-top: 2px;
+    }
+    .metric-delta-neg {
+        font-size: 0.8rem;
+        color: #f56565;
+        margin-top: 2px;
+    }
+</style>
+""", unsafe_with_html=True)
+
 # --- GLOBAL DATA DICTIONARIES ---
 WATCHLIST = {
     "RELIANCE.NS": {"sector": "Energy", "cap": "Large"}, "TCS.NS": {"sector": "IT", "cap": "Large"},
@@ -25,9 +68,7 @@ WATCHLIST = {
 
 MACROS_AND_SECTORS = {
     "^NSEI": "Nifty 50", "^NSEBANK": "Bank Nifty", "^INDIAVIX": "India VIX", 
-    "INR=X": "USD/INR", "DX-Y.NYB": "Dollar Index (DXY)", "BZ=F": "Brent Crude", "GC=F": "Gold (Global)",
-    "^CNXIT": "Nifty IT", "^CNXAUTO": "Nifty Auto", "^CNXPHARMA": "Nifty Pharma",
-    "^CNXFMCG": "Nifty FMCG", "^CNXMETAL": "Nifty Metal", "^CNXENERGY": "Nifty Energy"
+    "INR=X": "USD/INR", "DX-Y.NYB": "Dollar Index", "BZ=F": "Brent Crude", "GC=F": "Gold (Global)"
 }
 
 # --- NATIVE TECHNICAL INDICATORS ---
@@ -57,22 +98,24 @@ setup_ssl_certificates()
 st.title("📊 Nivesh Bodh: Pre-Market Engine")
 st.markdown("A top-down algorithmic market scanner by **Nivesh Gyanam**")
 
-# Add a manual refresh button in the sidebar to let users clear cache instantly
 if st.sidebar.button("🔄 Force Live Refresh"):
     st.cache_data.clear()
     st.rerun()
 
 st.divider()
 
-# --- 1. MACRO MARKET SNAPSHOT (BATCH FETCH) ---
+# --- [FUTURE SPRINT SNEAK PEEK] PRE-MARKET SENTIMENT MONITOR ---
+st.sidebar.markdown("### 🧭 Market Sentiment Hub")
+st.sidebar.info("**GIFT Nifty Premium:** Integrating Live Feeds...\n\n**FII / DII Flows:** Integrating Daily Data Ingestion...")
+
+# --- 1. MACRO MARKET SNAPSHOT (COMPACT MOBILE BOXES) ---
 st.subheader("1. Macro Market Snapshot")
 
-@st.cache_data(ttl=60)  # Lowered cache to 1 minute for snappier live tracking
+@st.cache_data(ttl=60)
 def get_macro_data_batch():
-    macros = ["^NSEI", "^NSEBANK", "^INDIAVIX", "INR=X", "DX-Y.NYB", "BZ=F", "GC=F"]
+    macros = list(MACROS_AND_SECTORS.keys())
     data = []
     try:
-        # Fetch everything in ONE network call
         group = yf.download(macros, period="5d", group_by='ticker', progress=False)
         for ticker in macros:
             if ticker in group.columns.levels[0]:
@@ -82,54 +125,39 @@ def get_macro_data_batch():
                     prev_close = df['Close'].iloc[-2]
                     change_pct = ((last_close - prev_close) / prev_close) * 100
                     unit = "$" if "F" in ticker else "₹" if "INR" in ticker or "NSE" in ticker else ""
-                    data.append({"Name": MACROS_AND_SECTORS[ticker], "Price": f"{unit}{last_close:,.2f}", "Delta": f"{change_pct:+.2f}%"})
-    except Exception as e:
+                    data.append({
+                        "Name": MACROS_AND_SECTORS[ticker], 
+                        "Price": f"{unit}{last_close:,.2f}", 
+                        "Delta": f"{change_pct:+.2f}%",
+                        "IsPositive": change_pct >= 0
+                    })
+    except:
         pass
     return data
 
 macro_data = get_macro_data_batch()
+
 if macro_data:
-    cols = st.columns(len(macro_data))
-    for i, item in enumerate(macro_data):
-        cols[i].metric(label=item["Name"], value=item["Price"], delta=item["Delta"])
+    # Build HTML string dynamically to output the responsive grid system
+    html_grid = '<div class="metric-container">'
+    for item in macro_data:
+        delta_class = "metric-delta-pos" if item["IsPositive"] else "metric-delta-neg"
+        html_grid += f"""
+        <div class="metric-card">
+            <div class="metric-title">{item["Name"]}</div>
+            <div class="metric-value">{item["Price"]}</div>
+            <div class="{delta_class}">{item["Delta"]}</div>
+        </div>
+        """
+    html_grid += '</div>'
+    st.markdown(html_grid, unsafe_with_html=True)
 else:
     st.info("🔄 Refreshing Macro Market feeds...")
 
 st.divider()
 
-# --- 2. SECTOR INDEX HEATMAP (BATCH FETCH) ---
-st.subheader("2. Sector Index Heatmap")
-
-@st.cache_data(ttl=60)
-def get_sector_data_batch():
-    sectors = ["^CNXIT", "^CNXAUTO", "^CNXPHARMA", "^CNXFMCG", "^CNXMETAL", "^CNXENERGY"]
-    results = []
-    try:
-        group = yf.download(sectors, period="5d", group_by='ticker', progress=False)
-        for ticker in sectors:
-            if ticker in group.columns.levels[0]:
-                df = group[ticker].dropna()
-                if not df.empty and len(df) >= 2:
-                    last_close = df['Close'].iloc[-1]
-                    prev_close = df['Close'].iloc[-2]
-                    change = ((last_close - prev_close) / prev_close) * 100
-                    results.append({"Sector": MACROS_AND_SECTORS[ticker], "Close": round(last_close, 2), "Change (%)": round(change, 2)})
-    except:
-        pass
-    if results:
-        return pd.DataFrame(results).sort_values(by="Change (%)", ascending=False).reset_index(drop=True)
-    return pd.DataFrame(columns=["Sector", "Close", "Change (%)"])
-
-sector_df = get_sector_data_batch()
-if not sector_df.empty:
-    st.dataframe(sector_df, width='stretch')
-else:
-    st.info("🔄 Re-calculating sector matrices...")
-
-st.divider()
-
-# --- 3. CROSS-SECTOR MULTI-CAP VIEW (BATCH FETCH) ---
-st.subheader("3. Cross-Sector Multi-Cap View")
+# --- 2. CROSS-SECTOR MULTI-CAP VIEW (WITH GYANAM SCORE) ---
+st.subheader("2. Cross-Sector Multi-Cap View")
 
 def calculate_gyanam_score(latest_data):
     score = 0
@@ -148,7 +176,6 @@ def get_stock_data_batch():
     tickers = list(WATCHLIST.keys())
     results = []
     try:
-        # Pull 6 months of data for all stocks at once
         group = yf.download(tickers, period="6mo", group_by='ticker', progress=False)
         for ticker in tickers:
             if ticker in group.columns.levels[0]:
@@ -175,91 +202,4 @@ def get_stock_data_batch():
                     results.append({
                         "Ticker": ticker.replace(".NS", ""), "Sector": WATCHLIST[ticker]["sector"],
                         "Close (₹)": round(latest['Close'], 2), 
-                        "Gyanam Score": f"{int(g_score)} / 100",
-                        "RSI (14)": round(latest['RSI_14'], 2) if not pd.isna(latest['RSI_14']) else 50.0,
-                        "Actionable Signal": signal_text
-                    })
-    except:
-        pass
-    if results:
-        return pd.DataFrame(results)
-    return pd.DataFrame(columns=["Ticker", "Sector", "Close (₹)", "Gyanam Score", "RSI (14)", "Actionable Signal"])
-
-stock_df = get_stock_data_batch()
-if not stock_df.empty:
-    st.dataframe(stock_df, width='stretch')
-else:
-    st.info("🔄 Running multi-cap scan...")
-
-st.divider()
-
-# --- 4. STOCK GYANAM: DEEP DIVE HUB ---
-st.subheader("🔍 4. Stock Gyanam: Analysis & Charting Hub")
-
-combined_options = list(WATCHLIST.keys()) + list(MACROS_AND_SECTORS.keys())
-def format_dropdown(ticker):
-    if ticker in WATCHLIST: return f"{ticker.replace('.NS', '')} [Stock]"
-    return f"{MACROS_AND_SECTORS[ticker]} [Macro/Index]"
-
-selected_asset = st.selectbox("Select Asset to Analyze:", combined_options, format_func=format_dropdown)
-
-if selected_asset:
-    with st.spinner(f"Loading Gyanam Diagnostics..."):
-        try:
-            gyanam_stock = yf.Ticker(selected_asset)
-            tab_chart, tab_fundamentals = st.tabs(["📈 Technical Charting", "🏢 Functional/Fundamental Health"])
-            
-            with tab_chart:
-                chart_df = gyanam_stock.history(period="6mo")
-                if not chart_df.empty and len(chart_df) > 50:
-                    chart_df['EMA_20'] = chart_df['Close'].ewm(span=20, adjust=False).mean()
-                    chart_df['EMA_50'] = chart_df['Close'].ewm(span=50, adjust=False).mean()
-                    
-                    fig = go.Figure()
-                    fig.add_trace(go.Candlestick(x=chart_df.index, open=chart_df['Open'], high=chart_df['High'],
-                                    low=chart_df['Low'], close=chart_df['Close'], name='Price'))
-                    fig.add_trace(go.Scatter(x=chart_df.index, y=chart_df['EMA_20'], line=dict(color='orange', width=2), name='20-Day EMA'))
-                    fig.add_trace(go.Scatter(x=chart_df.index, y=chart_df['EMA_50'], line=dict(color='cyan', width=2), name='50-Day EMA'))
-                    
-                    fig.update_layout(height=500, margin=dict(l=0, r=0, t=20, b=0), xaxis_rangeslider_visible=False, template="plotly_dark")
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.warning("Could not load sufficient chart data.")
-
-            with tab_fundamentals:
-                if selected_asset in MACROS_AND_SECTORS:
-                    st.info("💡 **Macro Asset Selected:** Institutional fundamentals do not apply to global indices.")
-                else:
-                    try:
-                        info = gyanam_stock.info
-                        pe_ratio = round(info.get('trailingPE', 0), 2) if info.get('trailingPE') else "N/A"
-                        roe = round(info.get('returnOnEquity', 0) * 100, 2) if info.get('returnOnEquity') else "N/A"
-                        debt_eq = round(info.get('debtToEquity', 0) / 100, 2) if info.get('debtToEquity') else "N/A"
-                        margins = round(info.get('profitMargins', 0) * 100, 2) if info.get('profitMargins') else "N/A"
-                        
-                        st.markdown("### Core Financial Scorecard")
-                        col1, col2, col3, col4 = st.columns(4)
-                        col1.metric("P/E Ratio", pe_ratio)
-                        col2.metric("Return on Equity (ROE)", f"{roe}%" if roe != "N/A" else "N/A")
-                        col3.metric("Debt-to-Equity", debt_eq)
-                        col4.metric("Net Profit Margin", f"{margins}%" if margins != "N/A" else "N/A")
-                    except:
-                        st.warning("Fundamental data temporarily unavailable.")
-        except:
-            st.error("Error running deep dive diagnostics.")
-
-st.divider()
-
-# --- 5. DAILY LEARNING ---
-st.subheader("5. Nivesh Gyanam: Daily Learning")
-topics = [
-    {"topic": "MACD Crossovers", "lesson": "When the MACD line crosses above the Signal line, it indicates shifting bullish momentum. When paired with an RSI crossing 50, probability of a sustained rally increases."},
-    {"topic": "The 50-EMA Baseline", "lesson": "The 50-Day Exponential Moving Average is the institutional baseline. Assets trading above it are in uptrends; assets below it are in downtrends. Buy the bounces, sell the breakdowns."},
-    {"topic": "Volume Validation", "lesson": "A breakout is only trustworthy if the daily volume significantly exceeds the 20-day Volume MA. Low volume breakouts are often traps."},
-    {"topic": "Position Sizing", "lesson": "Never risk more than 1-2% of your total capital on a single trade. If your stop loss is hit, the portfolio should barely feel it."}
-]
-day_of_year = datetime.now().timetuple().tm_yday
-random.seed(day_of_year)
-daily_lesson = random.choice(topics)
-st.info(f"**💡 {daily_lesson['topic']}**: {daily_lesson['lesson']}")
-random.seed()
+                        "Gyanam Score": f"{int(g_score)} / 10
