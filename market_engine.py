@@ -12,47 +12,51 @@ import tempfile
 # --- UI PAGE CONFIGURATION ---
 st.set_page_config(page_title="Nivesh Bodh", page_icon="📊", layout="wide")
 
-# --- MOBILE COMPACT CARD STYLE INJECTION ---
-st.markdown("""
+# --- SAFE CSS INJECTION VIA HTML COMPONENT ---
+# This isolates the curly braces from Streamlit's markdown parser to prevent rendering errors
+st.components.v1.html("""
 <style>
+    body {
+        background-color: #0e1117;
+    }
     .metric-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-        gap: 10px;
-        margin-bottom: 20px;
+        display: grid !important;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) !important;
+        gap: 10px !important;
+        margin-bottom: 20px !important;
     }
     .metric-card {
-        background-color: #1e2430;
-        border: 1px solid #2d3748;
-        border-radius: 8px;
-        padding: 12px;
-        text-align: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        background-color: #1e2430 !important;
+        border: 1px solid #2d3748 !important;
+        border-radius: 8px !important;
+        padding: 12px !important;
+        text-align: center !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
     }
     .metric-title {
-        font-size: 0.8rem;
-        color: #a0aec0;
-        font-weight: 600;
-        margin-bottom: 4px;
-        text-transform: uppercase;
+        font-size: 0.8rem !important;
+        color: #a0aec0 !important;
+        font-weight: 600 !important;
+        margin-bottom: 4px !important;
+        text-transform: uppercase !important;
     }
     .metric-value {
-        font-size: 1.1rem;
-        color: #ffffff;
-        font-weight: bold;
+        font-size: 1.1rem !important;
+        color: #ffffff !important;
+        font-weight: bold !important;
     }
     .metric-delta-pos {
-        font-size: 0.8rem;
-        color: #48bb78;
-        margin-top: 2px;
+        font-size: 0.8rem !important;
+        color: #48bb78 !important;
+        margin-top: 2px !important;
     }
     .metric-delta-neg {
-        font-size: 0.8rem;
-        color: #f56565;
-        margin-top: 2px;
+        font-size: 0.8rem !important;
+        color: #f56565 !important;
+        margin-top: 2px !important;
     }
 </style>
-""", unsafe_with_html=True)
+""", height=0)
 
 # --- GLOBAL DATA DICTIONARIES ---
 WATCHLIST = {
@@ -137,7 +141,6 @@ def get_macro_data_batch():
 macro_data = get_macro_data_batch()
 
 if macro_data:
-    # Safely construct the raw responsive boxes HTML
     cards_html = ""
     for item in macro_data:
         delta_class = "metric-delta-pos" if item["IsPositive"] else "metric-delta-neg"
