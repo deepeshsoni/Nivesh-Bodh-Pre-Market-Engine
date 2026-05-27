@@ -48,7 +48,7 @@ setup_ssl()
 # --- HEADER ---
 st.title("📊 Nivesh Bodh: Pre-Market Engine")
 st.markdown("A top-down algorithmic market scanner by **Nivesh Gyanam | Deepesh Soni**")
-st.caption("⚡ **Dashboard Quick-View:** 1️⃣ Macro Matrix | 2️⃣ Sector Heatmap | 3️⃣ Stock Tracker | 4️⃣ Deep Dive | 5️⃣ Market News")
+st.caption("⚡ **Dashboard Quick-View:** 1️⃣ Macro Matrix | 2️⃣ Sector Heatmap | 3️⃣ Stock Tracker | 4️⃣ Deep Dive | 5️⃣ Market News | 6️⃣ Daily Learning")
 
 if st.sidebar.button("🔄 Force Live Refresh"):
     st.cache_data.clear()
@@ -70,7 +70,6 @@ st.subheader("🌐 1. Macro Market Snapshot")
 def get_macro_data():
     macros = ["^NSEI", "^NSEBANK", "^INDIAVIX", "^IXIC", "INR=X", "DX-Y.NYB", "BZ=F", "GC=F"]
     data = []
-    # Fetching individually prevents yFinance from failing the whole batch if one lags
     for ticker in macros:
         try:
             df = yf.download(ticker, period="5d", progress=False)
@@ -163,7 +162,6 @@ def get_stock_data():
         try:
             df = yf.download(ticker, period="6mo", progress=False)
             if not df.empty and len(df) > 50:
-                # Standardize flat columns for yfinance changes
                 if isinstance(df.columns, pd.MultiIndex):
                     df.columns = df.columns.droplevel(1)
                     
@@ -243,50 +241,28 @@ if selected_asset:
                 st.warning("Insufficient trading history to populate chart indicators.")
 
         with tab_fundamentals:
-            if ".NS" not in selected_asset:
-                st.info("💡 **Macro Asset Selected:** Institutional metrics like P/E and ROE are restricted to equity stocks.")
-            else:
-                try:
-                    info = gyanam_stock.info
-                    pe_ratio = round(info.get('trailingPE', 0), 2) if info.get('trailingPE') else "N/A"
-                    roe = round(info.get('returnOnEquity', 0) * 100, 2) if info.get('returnOnEquity') else "N/A"
-                    debt_eq = round(info.get('debtToEquity', 0) / 100, 2) if info.get('debtToEquity') else "N/A"
-                    margins = round(info.get('profitMargins', 0) * 100, 2) if info.get('profitMargins') else "N/A"
-                    
-                    st.markdown("### Core Financial Scorecard")
-                    col1, col2, col3, col4 = st.columns(4)
-                    col1.metric("P/E Ratio", pe_ratio)
-                    col2.metric("Return on Equity (ROE)", f"{roe}%" if roe != "N/A" else "N/A")
-                    col3.metric("Debt-to-Equity", debt_eq)
-                    col4.metric("Net Profit Margin", f"{margins}%" if margins != "N/A" else "N/A")
-                except:
-                    st.warning("Fundamental financial details temporarily out of sync.")
+            # Replaced failing yfinance scrape with a clean Coming Soon placeholder
+            st.info("🔒 **Pro Feature:** Deep fundamental financial metrics (P/E, ROE, Debt-to-Equity) are migrating to a dedicated institutional API. **Coming Soon!**")
     except:
         st.error("Error generating granular asset insights.")
 
 st.divider()
 
-# --- 5. MARKET NEWS & DAILY LEARNING ---
-st.subheader("📰 5. Market News & Daily Learning")
+# --- 5. MARKET NEWS ---
+st.subheader("📰 5. Market News")
+st.info("🔒 **Premium Feed:** Real-time algorithmic market news and macroeconomic sentiment tracking is **Coming Soon!**")
 
-tab_news, tab_learn = st.tabs(["Live Market Feeds", "Algorithmic Learning"])
+st.divider()
 
-with tab_news:
-    st.info("⚡ Real-time News API integration standing by.")
-    st.markdown("""
-    * **Global Equities:** US markets show resilience; tech sector leads global momentum.
-    * **Domestic Flows:** Focus heavily shifts towards FII/DII institutional cash movements post-earnings.
-    * **Derivatives:** Retail F&O volumes under observation by regulators.
-    """)
-
-with tab_learn:
-    topics = [
-        {"topic": "MACD Crossovers", "lesson": "When the MACD line crosses above the Signal line, it indicates shifting bullish momentum. When paired with an RSI crossing 50, probability of a sustained rally increases."},
-        {"topic": "The 50-EMA Baseline", "lesson": "The 50-Day Exponential Moving Average is the institutional baseline. Assets trading above it are in uptrends; assets below it are in downtrends. Buy the bounces, sell the breakdowns."},
-        {"topic": "Volume Validation", "lesson": "A breakout is only trustworthy if the daily volume significantly exceeds the 20-day Volume MA. Low volume breakouts are often traps."}
-    ]
-    day_of_year = datetime.now().timetuple().tm_yday
-    random.seed(day_of_year)
-    daily_lesson = random.choice(topics)
-    st.success(f"**💡 {daily_lesson['topic']}**: {daily_lesson['lesson']}")
-    random.seed()
+# --- 6. DAILY LEARNING ---
+st.subheader("🧠 6. Nivesh Gyanam: Daily Learning")
+topics = [
+    {"topic": "MACD Crossovers", "lesson": "When the MACD line crosses above the Signal line, it indicates shifting bullish momentum. When paired with an RSI crossing 50, probability of a sustained rally increases."},
+    {"topic": "The 50-EMA Baseline", "lesson": "The 50-Day Exponential Moving Average is the institutional baseline. Assets trading above it are in uptrends; assets below it are in downtrends. Buy the bounces, sell the breakdowns."},
+    {"topic": "Volume Validation", "lesson": "A breakout is only trustworthy if the daily volume significantly exceeds the 20-day Volume MA. Low volume breakouts are often traps."}
+]
+day_of_year = datetime.now().timetuple().tm_yday
+random.seed(day_of_year)
+daily_lesson = random.choice(topics)
+st.success(f"**💡 {daily_lesson['topic']}**: {daily_lesson['lesson']}")
+random.seed()
