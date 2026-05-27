@@ -7,8 +7,6 @@ import random
 from datetime import datetime
 import certifi
 import os
-import sys
-import tempfile
 
 # --- UI PAGE CONFIGURATION ---
 st.set_page_config(page_title="Nivesh Bodh", page_icon="📊", layout="wide")
@@ -24,15 +22,15 @@ WATCHLIST = {
     "EASEMYTRIP.NS": {"sector": "Travel", "cap": "Small"}
 }
 
-# ADDED NASDAQ (^IXIC) FOR GLOBAL TECH INFLUENCE
 MACROS_AND_SECTORS = {
     "^NSEI": "Nifty 50", "^NSEBANK": "Bank Nifty", "^INDIAVIX": "India VIX", 
-    "^IXIC": "Nasdaq (Global Tech)", "INR=X": "USD/INR", "DX-Y.NYB": "Dollar Index", 
-    "BZ=F": "Brent Crude", "GC=F": "Gold (Global)",
+    "^IXIC": "Nasdaq", "INR=X": "USD/INR", "DX-Y.NYB": "Dollar Index", 
+    "BZ=F": "Brent Crude", "GC=F": "Gold",
     "^CNXIT": "Nifty IT", "^CNXAUTO": "Nifty Auto", "^CNXPHARMA": "Nifty Pharma",
     "^CNXFMCG": "Nifty FMCG", "^CNXMETAL": "Nifty Metal", "^CNXENERGY": "Nifty Energy"
 }
 
+# --- NATIVE TECHNICAL INDICATORS ---
 def compute_rsi(series, period=14):
     delta = series.diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
@@ -40,26 +38,17 @@ def compute_rsi(series, period=14):
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
+# --- UNIVERSAL SSL FIX ---
 @st.cache_resource
-def setup_ssl_certificates():
-    cache_dir = os.path.join(tempfile.gettempdir(), "nivesh_bodh")
-    os.makedirs(cache_dir, exist_ok=True)
-    combined_path = os.path.join(cache_dir, "ca_bundle.pem")
-    with open(certifi.where(), "rb") as src: bundle = src.read()
-    with open(combined_path, "wb") as dst: dst.write(bundle)
-    os.environ["CURL_CA_BUNDLE"] = combined_path
-    os.environ["SSL_CERT_FILE"] = combined_path
-    os.environ["REQUESTS_CA_BUNDLE"] = combined_path
-    return combined_path
+def setup_ssl():
+    os.environ["CURL_CA_BUNDLE"] = certifi.where()
+    return True
+setup_ssl()
 
-setup_ssl_certificates()
-
-# --- HEADER & SMART NAVIGATION ---
+# --- HEADER ---
 st.title("📊 Nivesh Bodh: Pre-Market Engine")
 st.markdown("A top-down algorithmic market scanner by **Nivesh Gyanam | Deepesh Soni**")
-
-# SMART NAVIGATION GUIDE (Tells users exactly what is below)
-st.caption("⚡ **Dashboard Quick-View:** 1️⃣ Directional Bias | 2️⃣ Macro Matrix | 3️⃣ Sector Heatmap | 4️⃣ Stock Gyanam Tracker | 5️⃣ Market News")
+st.caption("⚡ **Dashboard Quick-View:** 1️⃣ Macro Matrix | 2️⃣ Sector Heatmap | 3️⃣ Stock Tracker | 4️⃣ Deep Dive | 5️⃣ Market News")
 
 if st.sidebar.button("🔄 Force Live Refresh"):
     st.cache_data.clear()
@@ -67,107 +56,41 @@ if st.sidebar.button("🔄 Force Live Refresh"):
 
 st.divider()
 
-# --- SIDEBAR: PREMIUM TEASERS & OPTIONS DATA ---
+# --- SIDEBAR: PREMIUM TEASERS ---
 st.sidebar.markdown("### 🧭 Options Pulse (O/I)")
-st.sidebar.info("**Nifty PCR:** 0.85 (Oversold Area)\n\n**Max Pain Strike:** 22,500\n\n*(Derivatives API integration pending broker connection)*")
+st.sidebar.info("**Nifty PCR:** 0.85 (Oversold Area)\n\n**Max Pain Strike:** 22,500\n\n*(Derivatives integration pending)*")
 st.sidebar.divider()
 st.sidebar.markdown("### 🧠 Premium Features")
 st.sidebar.info("**FII / DII Matrix:** Coming Soon...\n\n**Portfolio Alerts:** Coming Soon...")
 
-# --- 1. PRE-MARKET DIRECTIONAL BIAS ENGINE & DYNAMIC ONE-LINER ---
-st.subheader("🧭 1. Early Morning Directional Bias")
-
-@st.cache_data(ttl=30)
-def calculate_pre_market_bias_safe():
-    try:
-        gift_ticker = yf.Ticker("IN1!=F")
-        gift_df = gift_ticker.history(period="2d")
-        
-        nifty_ticker = yf.Ticker("^NSEI")
-        nifty_df = nifty_ticker.history(period="2d")
-        
-        vix_ticker = yf.Ticker("^INDIAVIX")
-        vix_df = vix_ticker.history(period="2d")
-        
-        if not gift_df.empty and not nifty_df.empty and not vix_df.empty:
-            gift_live = gift_df['Close'].iloc[-1]
-            nifty_spot_close = nifty_df['Close'].iloc[-1]
-            gap_points = gift_live - nifty_spot_close
-            
-            nifty_change = ((nifty_spot_close - nifty_df['Close'].iloc[-2]) / nifty_df['Close'].iloc[-2]) * 100
-            vix_change = ((vix_df['Close'].iloc[-1] - vix_df['Close'].iloc[-2]) / vix_df['Close'].iloc[-2]) * 100
-            
-            # Smart One-Liner Logic
-            if nifty_change < -0.5 and vix_change > 2:
-                pulse = "🚨 **Smart Pulse:** Nifty is facing pressure today amid a sharp spike in India VIX. Defensive stance recommended."
-            elif nifty_change > 0.5 and gap_points > 20:
-                pulse = "🔥 **Smart Pulse:** Bulls are in full control globally. Look for breakout confirmation in High-Beta sectors like Metals and Autos."
-            else:
-                pulse = "⚖️ **Smart Pulse:** Market is in a tight consolidation phase. Focus strictly on stock-specific setups and sector rotation."
-
-            if gap_points >= 70:
-                sentiment, color = "🚀 STRONG GAP-UP EXPECTED", "green"
-            elif 20 <= gap_points < 70:
-                sentiment, color = "🟢 MILD POSITIVE OPENING", "green"
-            elif -20 < gap_points < 20:
-                sentiment, color = "⚪ FLAT / NEUTRAL OPENING", "orange"
-            elif -70 < gap_points <= -20:
-                sentiment, color = "🔴 MILD NEGATIVE OPENING", "red"
-            else:
-                sentiment, color = "💥 STRUCTURAL GAP-DOWN EXPECTED", "red"
-                
-            return {"sentiment": sentiment, "color": color, "gift": gift_live, "nifty": nifty_spot_close, "pulse": pulse}
-    except:
-        pass
-    return None
-
-bias_data = calculate_pre_market_bias_safe()
-
-if bias_data:
-    with st.container(border=True):
-        if bias_data["color"] == "green":
-            st.success(f"### {bias_data['sentiment']}")
-        elif bias_data["color"] == "orange":
-            st.warning(f"### {bias_data['sentiment']}")
-        else:
-            st.error(f"### {bias_data['sentiment']}")
-            
-        st.markdown(bias_data["pulse"])
-        st.caption(f"GIFT Nifty Continuous Proxy: {bias_data['gift']:,.2f} | Nifty Spot Prev Close: {bias_data['nifty']:,.2f}")
-else:
-    st.info("🧭 Syncing cross-border data nodes. Click 'Force Live Refresh' in the sidebar if this takes more than 10 seconds.")
-
-st.divider()
-
-# --- 2. PREMIUM MACRO MARKET SNAPSHOT ---
-st.subheader("🌐 2. Macro Market Snapshot")
+# --- 1. PREMIUM MACRO MARKET SNAPSHOT ---
+st.subheader("🌐 1. Macro Market Snapshot")
 
 @st.cache_data(ttl=60)
-def get_macro_data_batch():
+def get_macro_data():
     macros = ["^NSEI", "^NSEBANK", "^INDIAVIX", "^IXIC", "INR=X", "DX-Y.NYB", "BZ=F", "GC=F"]
     data = []
-    try:
-        group = yf.download(macros, period="5d", group_by='ticker', progress=False)
-        for ticker in macros:
-            if ticker in group.columns.levels[0]:
-                df = group[ticker].dropna()
-                if not df.empty and len(df) >= 2:
-                    last_close = df['Close'].iloc[-1]
-                    prev_close = df['Close'].iloc[-2]
-                    change_pct = ((last_close - prev_close) / prev_close) * 100
-                    unit = "$" if "F" in ticker or "^IXIC" in ticker else "₹" if "INR" in ticker or "NSE" in ticker else ""
-                    
-                    data.append({
-                        "Global Asset": MACROS_AND_SECTORS[ticker], 
-                        "Value": f"{unit}{last_close:,.2f}", 
-                        "RawChange": change_pct, 
-                        "Change (%)": f"{change_pct:+.2f}%"
-                    })
-    except:
-        pass
+    # Fetching individually prevents yFinance from failing the whole batch if one lags
+    for ticker in macros:
+        try:
+            df = yf.download(ticker, period="5d", progress=False)
+            if not df.empty and len(df) >= 2:
+                last_close = df['Close'].iloc[-1].item() if isinstance(df['Close'].iloc[-1], pd.Series) else float(df['Close'].iloc[-1])
+                prev_close = df['Close'].iloc[-2].item() if isinstance(df['Close'].iloc[-2], pd.Series) else float(df['Close'].iloc[-2])
+                change_pct = ((last_close - prev_close) / prev_close) * 100
+                unit = "$" if "F" in ticker or "^IXIC" in ticker else "₹" if "INR" in ticker or "NSE" in ticker else ""
+                
+                data.append({
+                    "Global Asset": MACROS_AND_SECTORS[ticker], 
+                    "Value": f"{unit}{last_close:,.2f}", 
+                    "RawChange": change_pct, 
+                    "Change (%)": f"{change_pct:+.2f}%"
+                })
+        except:
+            continue
     return data
 
-macro_list = get_macro_data_batch()
+macro_list = get_macro_data()
 
 if macro_list:
     macro_matrix_df = pd.DataFrame(macro_list)
@@ -175,38 +98,33 @@ if macro_list:
         text_color = "#48bb78" if row["RawChange"] >= 0 else "#f56565"
         return ["", f"color: {text_color}; font-weight: bold;", "", f"color: {text_color}; font-weight: bold;"]
 
-    cleaned_render_df = macro_matrix_df.drop(columns=["RawChange"])
     styled_ticker_df = macro_matrix_df.style.apply(style_macro_ticker, axis=1)
-    st.dataframe(styled_ticker_df, use_container_width=True, hide_index=True, column_order=["Global Asset", "Value", "Change (%)"])
+    st.dataframe(styled_ticker_df.hide(axis="index"), use_container_width=True, column_order=["Global Asset", "Value", "Change (%)"])
 else:
     st.info("🔄 Refreshing Macro Market feeds...")
 
 st.divider()
 
-# --- 3. INTERACTIVE SECTOR HEATMAP (ANIMATED TREEMAP) ---
-st.subheader("🔥 3. Sector Index Heatmap")
+# --- 2. SECTOR INDEX HEATMAP ---
+st.subheader("🔥 2. Sector Index Heatmap")
 
 @st.cache_data(ttl=60)
-def get_sector_data_batch():
+def get_sector_data():
     sectors = ["^CNXIT", "^CNXAUTO", "^CNXPHARMA", "^CNXFMCG", "^CNXMETAL", "^CNXENERGY"]
     results = []
-    try:
-        group = yf.download(sectors, period="5d", group_by='ticker', progress=False)
-        for ticker in sectors:
-            if ticker in group.columns.levels[0]:
-                df = group[ticker].dropna()
-                if not df.empty and len(df) >= 2:
-                    last_close = df['Close'].iloc[-1]
-                    prev_close = df['Close'].iloc[-2]
-                    change = ((last_close - prev_close) / prev_close) * 100
-                    results.append({"Sector": MACROS_AND_SECTORS[ticker], "Close": round(last_close, 2), "Change (%)": round(change, 2)})
-    except:
-        pass
-    if results:
-        return pd.DataFrame(results)
-    return pd.DataFrame(columns=["Sector", "Close", "Change (%)"])
+    for ticker in sectors:
+        try:
+            df = yf.download(ticker, period="5d", progress=False)
+            if not df.empty and len(df) >= 2:
+                last_close = df['Close'].iloc[-1].item() if isinstance(df['Close'].iloc[-1], pd.Series) else float(df['Close'].iloc[-1])
+                prev_close = df['Close'].iloc[-2].item() if isinstance(df['Close'].iloc[-2], pd.Series) else float(df['Close'].iloc[-2])
+                change = ((last_close - prev_close) / prev_close) * 100
+                results.append({"Sector": MACROS_AND_SECTORS[ticker], "Close": round(last_close, 2), "Change (%)": round(change, 2)})
+        except:
+            continue
+    return pd.DataFrame(results)
 
-sector_df = get_sector_data_batch()
+sector_df = get_sector_data()
 if not sector_df.empty:
     sector_df["Market"] = "NSE Sectors"
     fig_tree = px.treemap(
@@ -222,8 +140,8 @@ else:
 
 st.divider()
 
-# --- 4. MULTI-CAP VIEW (ANIMATED PROGRESS BARS) ---
-st.subheader("🎯 4. Cross-Sector Multi-Cap Tracker")
+# --- 3. MULTI-CAP VIEW (ANIMATED PROGRESS BARS) ---
+st.subheader("🎯 3. Cross-Sector Multi-Cap Tracker")
 
 def calculate_gyanam_score(latest_data):
     score = 0
@@ -238,47 +156,47 @@ def calculate_gyanam_score(latest_data):
     return min(max(score, 0), 100)
 
 @st.cache_data(ttl=60)
-def get_stock_data_batch():
+def get_stock_data():
     tickers = list(WATCHLIST.keys())
     results = []
-    try:
-        group = yf.download(tickers, period="6mo", group_by='ticker', progress=False)
-        for ticker in tickers:
-            if ticker in group.columns.levels[0]:
-                df = group[ticker].dropna()
-                if not df.empty and len(df) > 50:
-                    df['RSI_14'] = compute_rsi(df['Close'])
-                    df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
-                    df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
+    for ticker in tickers:
+        try:
+            df = yf.download(ticker, period="6mo", progress=False)
+            if not df.empty and len(df) > 50:
+                # Standardize flat columns for yfinance changes
+                if isinstance(df.columns, pd.MultiIndex):
+                    df.columns = df.columns.droplevel(1)
                     
-                    exp1 = df['Close'].ewm(span=12, adjust=False).mean()
-                    exp2 = df['Close'].ewm(span=26, adjust=False).mean()
-                    df['MACD'] = exp1 - exp2
-                    df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
-                    df["Vol_MA_20"] = df["Volume"].rolling(window=20).mean()
-                    
-                    latest = df.iloc[-1]
-                    signals = []
-                    if latest['RSI_14'] > 70: signals.append("⚠️ OVERBOUGHT")
-                    elif latest['RSI_14'] < 30: signals.append("🟢 OVERSOLD")
-                    if latest['Volume'] > (1.5 * latest['Vol_MA_20']): signals.append("🔥 VOL BREAKOUT")
-                    signal_text = " + ".join(signals) if signals else "⚪ NEUTRAL"
-                    
-                    g_score = calculate_gyanam_score(latest)
-                    results.append({
-                        "Ticker": ticker.replace(".NS", ""), "Sector": WATCHLIST[ticker]["sector"],
-                        "Close (₹)": round(latest['Close'], 2), 
-                        "Gyanam Score": int(g_score),
-                        "RSI (14)": round(latest['RSI_14'], 2) if not pd.isna(latest['RSI_14']) else 50.0,
-                        "Actionable Signal": signal_text
-                    })
-    except:
-        pass
-    if results:
-        return pd.DataFrame(results)
-    return pd.DataFrame(columns=["Ticker", "Sector", "Close (₹)", "Gyanam Score", "RSI (14)", "Actionable Signal"])
+                df['RSI_14'] = compute_rsi(df['Close'])
+                df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
+                df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
+                
+                exp1 = df['Close'].ewm(span=12, adjust=False).mean()
+                exp2 = df['Close'].ewm(span=26, adjust=False).mean()
+                df['MACD'] = exp1 - exp2
+                df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+                df["Vol_MA_20"] = df["Volume"].rolling(window=20).mean()
+                
+                latest = df.iloc[-1]
+                signals = []
+                if latest['RSI_14'] > 70: signals.append("⚠️ OVERBOUGHT")
+                elif latest['RSI_14'] < 30: signals.append("🟢 OVERSOLD")
+                if latest['Volume'] > (1.5 * latest['Vol_MA_20']): signals.append("🔥 VOL BREAKOUT")
+                signal_text = " + ".join(signals) if signals else "⚪ NEUTRAL"
+                
+                g_score = calculate_gyanam_score(latest)
+                results.append({
+                    "Ticker": ticker.replace(".NS", ""), "Sector": WATCHLIST[ticker]["sector"],
+                    "Close (₹)": round(float(latest['Close']), 2), 
+                    "Gyanam Score": int(g_score),
+                    "RSI (14)": round(float(latest['RSI_14']), 2) if not pd.isna(latest['RSI_14']) else 50.0,
+                    "Actionable Signal": signal_text
+                })
+        except:
+            continue
+    return pd.DataFrame(results)
 
-stock_df = get_stock_data_batch()
+stock_df = get_stock_data()
 if not stock_df.empty:
     st.dataframe(
         stock_df, use_container_width=True, hide_index=True,
@@ -292,13 +210,13 @@ else:
 
 st.divider()
 
-# --- 5. STOCK GYANAM: DEEP DIVE HUB ---
-st.subheader("🔍 5. Stock Gyanam: Analysis & Charting Hub")
+# --- 4. STOCK GYANAM: DEEP DIVE HUB ---
+st.subheader("🔍 4. Stock Gyanam: Analysis & Charting Hub")
 
-combined_options = list(WATCHLIST.keys()) + [k for k in MACROS_AND_SECTORS.keys() if k in yf.download(list(MACROS_AND_SECTORS.keys()), period="1d", progress=False).columns.levels[0]]
+combined_options = list(WATCHLIST.keys()) + ["^NSEI", "^NSEBANK"]
 def format_dropdown(ticker):
     if ticker in WATCHLIST: return f"{ticker.replace('.NS', '')} [Stock]"
-    return f"{MACROS_AND_SECTORS[ticker]} [Macro/Index]"
+    return f"{MACROS_AND_SECTORS.get(ticker, ticker)} [Macro/Index]"
 
 selected_asset = st.selectbox("Select Asset to Analyze:", combined_options, format_func=format_dropdown)
 
@@ -319,7 +237,7 @@ if selected_asset:
                 fig.add_trace(go.Scatter(x=chart_df.index, y=chart_df['EMA_20'], line=dict(color='orange', width=2), name='20-Day EMA'))
                 fig.add_trace(go.Scatter(x=chart_df.index, y=chart_df['EMA_50'], line=dict(color='cyan', width=2), name='50-Day EMA'))
                 
-                fig.update_layout(height=500, margin=dict(l=0, r=0, t=20, b=0), xaxis_rangeslider_visible=False, template="plotly_dark")
+                fig.update_layout(height=400, margin=dict(l=0, r=0, t=20, b=0), xaxis_rangeslider_visible=False, template="plotly_dark")
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 st.warning("Insufficient trading history to populate chart indicators.")
@@ -348,18 +266,17 @@ if selected_asset:
 
 st.divider()
 
-# --- 6. MARKET NEWS & DAILY LEARNING ---
-st.subheader("📰 6. Market News & Daily Learning")
+# --- 5. MARKET NEWS & DAILY LEARNING ---
+st.subheader("📰 5. Market News & Daily Learning")
 
-tab_news, tab_learn = st.tabs(["Breaking News", "Algorithmic Learning"])
+tab_news, tab_learn = st.tabs(["Live Market Feeds", "Algorithmic Learning"])
 
 with tab_news:
-    # This is a placeholder UI layout for future News API integration
-    st.info("🔌 *News API integration pending. Displaying curated macro themes:*")
+    st.info("⚡ Real-time News API integration standing by.")
     st.markdown("""
-    * **Global Equities:** US Federal Reserve maintains rates, sparking tech sector relief rally (Nasdaq impact).
-    * **Domestic Flows:** SEBI issues new framework for derivative (F&O) trading volumes to curb retail speculation.
-    * **Commodities:** Brent Crude prices stabilize around $82/bbl as OPEC+ maintains supply cuts.
+    * **Global Equities:** US markets show resilience; tech sector leads global momentum.
+    * **Domestic Flows:** Focus heavily shifts towards FII/DII institutional cash movements post-earnings.
+    * **Derivatives:** Retail F&O volumes under observation by regulators.
     """)
 
 with tab_learn:
